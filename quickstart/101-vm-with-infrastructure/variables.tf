@@ -15,3 +15,14 @@ variable "username" {
   description = "The username for the local account that will be created on the new VM."
   default     = "azureadmin"
 }
+
+variable "resource_name_prefix" {
+  type        = string
+  description = "The prefix for the name of all resources created for VM infrastructure."
+  default     = "holx"
+}
+
+variable "disaster_recovery_copies" {
+  type    = number
+  default = 2  # Change this to the desired number of storage accounts
+}
