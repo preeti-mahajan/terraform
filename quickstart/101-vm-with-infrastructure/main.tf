@@ -9,7 +9,7 @@ resource "azurerm_resource_group" "rg" {
 
 # Create virtual network
 resource "azurerm_virtual_network" "my_terraform_network" {
-  name                = "myVnet"
+  name                = "${var.resource_name_prefix}Vnet"
   address_space       = ["10.0.0.0/16"]
   location            = azurerm_resource_group.rg.location
   resource_group_name = azurerm_resource_group.rg.name
@@ -17,15 +17,31 @@ resource "azurerm_virtual_network" "my_terraform_network" {
 
 # Create subnet
 resource "azurerm_subnet" "my_terraform_subnet" {
-  name                 = "mySubnet"
+  name                 = "${var.resource_name_prefix}Subnet"
   resource_group_name  = azurerm_resource_group.rg.name
   virtual_network_name = azurerm_virtual_network.my_terraform_network.name
   address_prefixes     = ["10.0.1.0/24"]
 }
 
+# Create subnet2
+resource "azurerm_subnet" "my_terraform_subnet2" {
+  name                 = "${var.resource_name_prefix}Subnet2"
+  resource_group_name  = azurerm_resource_group.rg.name
+  virtual_network_name = azurerm_virtual_network.my_terraform_network.name
+  address_prefixes     = ["10.0.2.0/24"]
+}
+
 # Create public IPs
 resource "azurerm_public_ip" "my_terraform_public_ip" {
-  name                = "myPublicIP"
+  name                = "${var.resource_name_prefix}PublicIP"
+  location            = azurerm_resource_group.rg.location
+  resource_group_name = azurerm_resource_group.rg.name
+  allocation_method   = "Dynamic"
+}
+
+# Create public IPs2
+resource "azurerm_public_ip" "my_terraform_public_ip2" {
+  name                = "${var.resource_name_prefix}PublicIP2"
   location            = azurerm_resource_group.rg.location
   resource_group_name = azurerm_resource_group.rg.name
   allocation_method   = "Dynamic"
@@ -33,7 +49,7 @@ resource "azurerm_public_ip" "my_terraform_public_ip" {
 
 # Create Network Security Group and rule
 resource "azurerm_network_security_group" "my_terraform_nsg" {
-  name                = "myNetworkSecurityGroup"
+  name                = "${var.resource_name_prefix}NetworkSecurityGroup"
   location            = azurerm_resource_group.rg.location
   resource_group_name = azurerm_resource_group.rg.name
 
@@ -52,7 +68,7 @@ resource "azurerm_network_security_group" "my_terraform_nsg" {
 
 # Create network interface
 resource "azurerm_network_interface" "my_terraform_nic" {
-  name                = "myNIC"
+  name                = "${var.resource_name_prefix}NIC"
   location            = azurerm_resource_group.rg.location
   resource_group_name = azurerm_resource_group.rg.name
 
@@ -64,9 +80,29 @@ resource "azurerm_network_interface" "my_terraform_nic" {
   }
 }
 
+# Create network interface 2
+resource "azurerm_network_interface" "my_terraform_nic2" {
+  name                = "${var.resource_name_prefix}NIC2"
+  location            = azurerm_resource_group.rg.location
+  resource_group_name = azurerm_resource_group.rg.name
+
+  ip_configuration {
+    name                          = "my_nic_configuration"
+    subnet_id                     = azurerm_subnet.my_terraform_subnet2.id
+    private_ip_address_allocation = "Dynamic"
+    public_ip_address_id          = azurerm_public_ip.my_terraform_public_ip2.id
+  }
+}
+
 # Connect the security group to the network interface
 resource "azurerm_network_interface_security_group_association" "example" {
   network_interface_id      = azurerm_network_interface.my_terraform_nic.id
+  network_security_group_id = azurerm_network_security_group.my_terraform_nsg.id
+}
+
+# Connect the security group to the network interface1
+resource "azurerm_network_interface_security_group_association" "example2" {
+  network_interface_id      = azurerm_network_interface.my_terraform_nic2.id
   network_security_group_id = azurerm_network_security_group.my_terraform_nsg.id
 }
 
@@ -82,7 +118,8 @@ resource "random_id" "random_id" {
 
 # Create storage account for boot diagnostics
 resource "azurerm_storage_account" "my_storage_account" {
-  name                     = "diag${random_id.random_id.hex}"
+  count                    = var.disaster_recovery_copies
+  name                     = "diag${random_id.random_id.hex}${count.index}"
   location                 = azurerm_resource_group.rg.location
   resource_group_name      = azurerm_resource_group.rg.name
   account_tier             = "Standard"
@@ -91,14 +128,14 @@ resource "azurerm_storage_account" "my_storage_account" {
 
 # Create virtual machine
 resource "azurerm_linux_virtual_machine" "my_terraform_vm" {
-  name                  = "myVM"
+  name                  = "${var.resource_name_prefix}${random_pet.rg_name.id}VM"
   location              = azurerm_resource_group.rg.location
   resource_group_name   = azurerm_resource_group.rg.name
   network_interface_ids = [azurerm_network_interface.my_terraform_nic.id]
   size                  = "Standard_DS1_v2"
 
   os_disk {
-    name                 = "myOsDisk"
+    name                 = "${var.resource_name_prefix}OsDisk"
     caching              = "ReadWrite"
     storage_account_type = "Premium_LRS"
   }
@@ -119,6 +156,47 @@ resource "azurerm_linux_virtual_machine" "my_terraform_vm" {
   }
 
   boot_diagnostics {
-    storage_account_uri = azurerm_storage_account.my_storage_account.primary_blob_endpoint
+    storage_account_uri = azurerm_storage_account.my_storage_account[0].primary_blob_endpoint
   }
+}
+
+# Create virtual machine 2
+resource "azurerm_windows_virtual_machine" "my_terraform_windows_vm" {
+  name                  = "${var.resource_name_prefix}${random_pet.rg_name.id}VM2"
+  location              = azurerm_resource_group.rg.location
+  resource_group_name   = azurerm_resource_group.rg.name
+  network_interface_ids = [azurerm_network_interface.my_terraform_nic2.id]
+  size                  = "Standard_DS1_v2"
+
+  os_disk {
+    name                 = "${var.resource_name_prefix}OsDisk1"
+    caching              = "ReadWrite"
+    storage_account_type = "Premium_LRS"
+  }
+
+  source_image_reference {
+    publisher = "MicrosoftWindowsServer"
+    offer     = "WindowsServer"
+    sku       = "2022-datacenter-azure-edition"
+    version   = "latest"
+  }
+
+  computer_name  = "hostname"
+  admin_username = var.username
+
+  admin_password = random_password.password.result
+  
+  boot_diagnostics {
+    storage_account_uri = azurerm_storage_account.my_storage_account[0].primary_blob_endpoint
+  }
+}
+
+# Generate random password 
+resource "random_password" "password" {
+  length      = 12
+  min_lower   = 1
+  min_upper   = 1
+  min_numeric = 1
+  min_special = 1
+  special     = true
 }
