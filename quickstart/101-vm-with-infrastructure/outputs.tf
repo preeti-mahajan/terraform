@@ -5,3 +5,7 @@ output "resource_group_name" {
 output "public_ip_address" {
   value = azurerm_linux_virtual_machine.my_terraform_vm.public_ip_address
 }
+
+output "public_ip_address2" {
+  value = azurerm_windows_virtual_machine.my_terraform_windows_vm.public_ip_address
+}
